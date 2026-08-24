@@ -8,6 +8,7 @@ import { hashSecret, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDollarsToCents } from "@/lib/money";
 import { parseISODate, periodForDate } from "@/lib/payPeriod";
+import { checkPin, PIN_FORMAT_MESSAGE, PIN_PATTERN, PIN_WEAK_MESSAGE } from "@/lib/pin";
 import { loadPeriod } from "@/lib/periods";
 import type { ActionState } from "./auth";
 
@@ -16,14 +17,8 @@ import type { ActionState } from "./auth";
 const employeeSchema = z.object({
   name: z.string().min(1, "Enter a name.").max(60),
   initials: z.string().max(6).optional(),
-  pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits."),
+  pin: z.string().regex(PIN_PATTERN, PIN_FORMAT_MESSAGE),
 });
-
-/** PINs that are trivially guessable get rejected outright. */
-const WEAK_PINS = new Set([
-  "0000", "1111", "2222", "3333", "4444", "5555", "6666", "7777", "8888", "9999",
-  "1234", "4321", "0123", "1230", "2580", "1379",
-]);
 
 export async function createEmployee(
   _prev: ActionState,
@@ -39,9 +34,7 @@ export async function createEmployee(
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message ?? "Check the details." };
     }
-    if (WEAK_PINS.has(parsed.data.pin)) {
-      return { error: "That PIN is too easy to guess. Pick something less obvious." };
-    }
+    if (checkPin(parsed.data.pin) === "WEAK") return { error: PIN_WEAK_MESSAGE };
 
     const duplicate = await db.user.findFirst({
       where: { name: parsed.data.name, role: "EMPLOYEE", active: true },
@@ -80,10 +73,9 @@ export async function resetPin(_prev: ActionState, formData: FormData): Promise<
     const pin = formData.get("pin")?.toString() ?? "";
 
     if (!userId) return { error: "Missing employee." };
-    if (!/^\d{4}$/.test(pin)) return { error: "PIN must be exactly 4 digits." };
-    if (WEAK_PINS.has(pin)) {
-      return { error: "That PIN is too easy to guess. Pick something less obvious." };
-    }
+    const problem = checkPin(pin);
+    if (problem === "FORMAT") return { error: PIN_FORMAT_MESSAGE };
+    if (problem === "WEAK") return { error: PIN_WEAK_MESSAGE };
 
     const user = await db.user.update({
       where: { id: userId },

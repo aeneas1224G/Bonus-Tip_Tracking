@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { createSession, destroySession, getSession, verifyAdminPassword, verifyPin } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { PIN_LENGTH, PIN_PATTERN } from "@/lib/pin";
 import { pruneRateLimits, rateLimit } from "@/lib/rateLimit";
 
 export type ActionState = { error?: string; success?: string };
@@ -18,7 +19,7 @@ async function clientKey(prefix: string): Promise<string> {
 
 const pinSchema = z.object({
   userId: z.string().min(1),
-  pin: z.string().regex(/^\d{4}$/, "Enter your 4-digit PIN."),
+  pin: z.string().regex(PIN_PATTERN, `Enter your ${PIN_LENGTH}-digit PIN.`),
 });
 
 export async function loginWithPin(
@@ -28,7 +29,7 @@ export async function loginWithPin(
   pruneRateLimits();
 
   // Per-IP throttle in front of the per-account lockout, so one machine cannot
-  // walk the whole 10,000-PIN keyspace by rotating through employees.
+  // grind the keyspace by rotating through employees.
   const limit = rateLimit(await clientKey("pin"), { limit: 10, windowSeconds: 60 });
   if (!limit.allowed) {
     return { error: `Too many attempts. Try again in ${limit.retryAfterSeconds} seconds.` };
@@ -39,7 +40,7 @@ export async function loginWithPin(
     pin: formData.get("pin"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter your 4-digit PIN." };
+    return { error: parsed.error.issues[0]?.message ?? `Enter your ${PIN_LENGTH}-digit PIN.` };
   }
 
   const result = await verifyPin(parsed.data.userId, parsed.data.pin);

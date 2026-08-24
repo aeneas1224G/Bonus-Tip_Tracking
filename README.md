@@ -64,22 +64,31 @@ Three other fixes:
 
 - **Owner** signs in with a username and password. Full add / edit / delete, can edit
   any day in an open period, sets PINs, edits rates, locks periods, exports to Gusto.
-- **Employees** tap their name and enter a 4-digit PIN. They log their own hours and
+- **Employees** tap their name and enter a 6-digit PIN. They log their own hours and
   cash tips, and can fill in the day's shared numbers (rentals, review count).
 - **Everyone sees everything.** Any signed-in employee can view the full period sheet,
   including what everyone else earned, matching how the shared spreadsheet worked.
 
 ### PIN security
 
-A 4-digit PIN is only 10,000 combinations, so the surrounding controls are what
-protect it:
+PINs are **6 digits** — a million combinations rather than the ten thousand a
+4-digit PIN gives you. The surrounding controls matter as much as the length:
 
 - Five wrong PINs locks that account for 15 minutes. The owner can unlock it instantly.
 - A per-IP throttle sits in front of that (10 attempts/minute), so one machine cannot
-  rotate through employees to walk the keyspace.
+  rotate through employees to grind the keyspace.
+- Guessable PINs are refused at the point they are set: all-same digits (`111111`),
+  repeated blocks (`121212`, `123123`) and straight runs (`123456`, `654321`).
 - PINs are stored bcrypt-hashed and can never be read back, only replaced.
 - Every sign-in, failed attempt, and money-affecting change is written to an
   append-only audit log.
+
+PIN length lives in one place — `PIN_LENGTH` in `src/lib/pin.ts`. The login pad,
+both admin forms, every validator and the seed script read from it, so changing
+the length again is a one-line edit.
+
+> **If PINs were already issued before this change**, they no longer work — a hash
+> cannot be lengthened. Reissue each one under Admin → Employees.
 
 If you later decide you want a shared staff password in front of the PIN pad, that
 is a small addition — one gate screen ahead of the name picker. It is not built yet;

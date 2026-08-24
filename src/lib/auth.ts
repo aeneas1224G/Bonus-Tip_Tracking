@@ -96,9 +96,9 @@ export async function requireAdmin(): Promise<SessionUser> {
 
 // --- PIN throttling ------------------------------------------------------
 //
-// A 4-digit PIN is only 10,000 combinations, so the lockout is what actually
-// protects it. Attempts are counted per employee and the account freezes for
-// a growing window once the threshold is passed.
+// A numeric PIN is a small keyspace however long it is, so the lockout is what
+// actually protects it. Attempts are counted per employee and the account
+// freezes once the threshold is passed.
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;

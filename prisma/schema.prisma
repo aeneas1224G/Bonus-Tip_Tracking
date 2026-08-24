@@ -27,7 +27,8 @@ enum TipKind {
   OTHER
 }
 
-/// Everyone who can sign in. Admins use username+password; employees use a 4-digit PIN.
+/// Everyone who can sign in. Admins use username+password; employees use a numeric PIN
+/// (length set by PIN_LENGTH in src/lib/pin.ts). Only the bcrypt hash is stored.
 model User {
   id       String  @id @default(cuid())
   name     String

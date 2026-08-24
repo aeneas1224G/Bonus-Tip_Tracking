@@ -43,8 +43,15 @@ const STAFF: Array<{ name: string; initials: string }> = [
   { name: "Adrian", initials: "ad" },
 ];
 
+/**
+ * Kept in step with PIN_LENGTH in src/lib/pin.ts. The seed cannot import from
+ * src/ because it runs outside the Next build, so the value is repeated here
+ * and asserted below rather than silently drifting.
+ */
+const PIN_LENGTH = 6;
+
 function randomPin(): string {
-  return String(randomInt(0, 10_000)).padStart(4, "0");
+  return String(randomInt(0, 10 ** PIN_LENGTH)).padStart(PIN_LENGTH, "0");
 }
 
 async function main() {
@@ -110,7 +117,7 @@ async function main() {
   }
 
   if (issued.length > 0) {
-    console.log("\n  Starter PINs — hand these out, then change them in Admin > Employees:");
+    console.log(`\n  Starter ${PIN_LENGTH}-digit PINs — hand these out, then change them in Admin > Employees:`);
     console.log("  ------------------------------------------------------------------");
     for (const [name, pin] of issued) console.log(`  ${name.padEnd(12)} ${pin}`);
     console.log("  ------------------------------------------------------------------");

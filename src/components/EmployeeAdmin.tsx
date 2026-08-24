@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { createEmployee, resetPin, setEmployeeActive, unlockAccount } from "@/app/actions/admin";
 import type { ActionState } from "@/app/actions/auth";
+import { PIN_INPUT_PATTERN, PIN_LENGTH } from "@/lib/pin";
 import { Banner, Button, Field, inputClass } from "./ui";
 
 function Submit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
@@ -35,14 +36,17 @@ export function AddEmployeeForm() {
         <Field label="Initials" hint="Optional — shown on closing duty.">
           <input name="initials" placeholder="br" maxLength={6} className={inputClass} />
         </Field>
-        <Field label="4-digit PIN" hint="Tell them in person. It is stored hashed.">
+        <Field
+          label={`${PIN_LENGTH}-digit PIN`}
+          hint="Tell them in person. It is stored hashed and cannot be read back."
+        >
           <input
             name="pin"
             inputMode="numeric"
-            pattern="\d{4}"
-            maxLength={4}
+            pattern={PIN_INPUT_PATTERN}
+            maxLength={PIN_LENGTH}
             required
-            placeholder="4820"
+            placeholder="482071"
             className={inputClass}
           />
         </Field>
@@ -63,11 +67,11 @@ export function ResetPinForm({ userId, name }: { userId: string; name: string })
         <input
           name="pin"
           inputMode="numeric"
-          pattern="\d{4}"
-          maxLength={4}
+          pattern={PIN_INPUT_PATTERN}
+          maxLength={PIN_LENGTH}
           required
-          placeholder="••••"
-          className="w-28 rounded-lg border border-ink/20 px-3 py-1.5 text-sm tabular"
+          placeholder={"•".repeat(PIN_LENGTH)}
+          className="w-32 rounded-lg border border-ink/20 px-3 py-1.5 text-sm tabular"
         />
       </label>
       <Submit label="Set PIN" pendingLabel="Saving…" />

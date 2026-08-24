@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { loginWithPin, type ActionState } from "@/app/actions/auth";
+import { PIN_LENGTH } from "@/lib/pin";
 import { Banner, Button } from "./ui";
 
 type Employee = { id: string; name: string; initials: string | null };
@@ -53,7 +54,7 @@ export function PinPad({ employees }: { employees: Employee[] }) {
   }
 
   const press = (digit: string) => {
-    setPin((current) => (current.length >= 4 ? current : current + digit));
+    setPin((current) => (current.length >= PIN_LENGTH ? current : current + digit));
   };
 
   return (
@@ -77,11 +78,14 @@ export function PinPad({ employees }: { employees: Employee[] }) {
 
       {state.error ? <Banner tone="error">{state.error}</Banner> : null}
 
-      <div className="mb-5 flex justify-center gap-3" aria-label={`${pin.length} of 4 digits entered`}>
-        {[0, 1, 2, 3].map((index) => (
+      <div
+        className="mb-5 flex justify-center gap-2.5"
+        aria-label={`${pin.length} of ${PIN_LENGTH} digits entered`}
+      >
+        {Array.from({ length: PIN_LENGTH }, (_, index) => (
           <span
             key={index}
-            className={`h-4 w-4 rounded-full border-2 ${
+            className={`h-3.5 w-3.5 rounded-full border-2 ${
               index < pin.length ? "border-clay bg-clay" : "border-ink/25"
             }`}
           />
@@ -118,7 +122,7 @@ export function PinPad({ employees }: { employees: Employee[] }) {
       </div>
 
       <div className="mx-auto mt-4 max-w-xs">
-        <SubmitRow disabled={pin.length !== 4} />
+        <SubmitRow disabled={pin.length !== PIN_LENGTH} />
       </div>
     </form>
   );

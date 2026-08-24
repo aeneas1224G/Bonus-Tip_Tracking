@@ -29,7 +29,10 @@ async function pinLogin(page, name, pin) {
   for (const digit of pin) {
     await page.getByRole("button", { name: digit, exact: true }).click();
   }
-  await page.waitForFunction(() => document.querySelector('input[name="pin"]')?.value.length === 4);
+  await page.waitForFunction(
+    (expected) => document.querySelector('input[name="pin"]')?.value.length === expected,
+    pin.length,
+  );
   await page.getByRole("button", { name: "Sign in" }).click();
   // Either we land on /entry, or an error banner appears in place.
   await Promise.race([
@@ -41,11 +44,41 @@ async function pinLogin(page, name, pin) {
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
 
+// ---------- 0. The pad expects a full-length PIN ----------
+{
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Kyle", exact: true }).click();
+  await page.waitForSelector('input[name="pin"]', { state: "attached" });
+
+  const dots = await page.locator('form [aria-label$="digits entered"] > span').count();
+  check("pad shows six slots", dots === 6, `${dots} slots`);
+
+  // Four digits is no longer enough to submit.
+  for (const digit of "1357") await page.getByRole("button", { name: digit, exact: true }).click();
+  await page.waitForTimeout(250);
+  const disabledAtFour = await page.getByRole("button", { name: "Sign in" }).isDisabled();
+  check("four digits cannot be submitted", disabledAtFour);
+
+  for (const digit of "92") await page.getByRole("button", { name: digit, exact: true }).click();
+  await page.waitForTimeout(250);
+  const enabledAtSix = await page.getByRole("button", { name: "Sign in" }).isEnabled();
+  check("six digits enables sign in", enabledAtSix);
+
+  // And a seventh keypress is ignored rather than overflowing.
+  await page.getByRole("button", { name: "4", exact: true }).click();
+  await page.waitForTimeout(200);
+  const value = await page.locator('input[name="pin"]').inputValue();
+  check("pad stops at six digits", value === "135792", `value ${value}`);
+  await ctx.close();
+}
+
 // ---------- 1. Wrong PIN is rejected ----------
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  const wrong = PINS.Kyle === "9999" ? "1111" : "9999";
+  const wrong = PINS.Kyle === "999999" ? "111222" : "999888";
   await pinLogin(page, "Kyle", wrong);
   const body = await page.textContent("body");
   check("wrong PIN rejected", !page.url().includes("/entry") && /not right/i.test(body ?? ""));
@@ -126,9 +159,12 @@ check("admin page redirects anonymous to login", admin.url().includes("/admin/lo
 await admin.fill('input[name="username"]', "admin");
 await admin.fill('input[name="password"]', "localtest1234");
 await admin.getByRole("button", { name: "Sign in" }).click();
-await admin.waitForLoadState("networkidle");
-await admin.waitForTimeout(600);
-check("admin signs in", admin.url().includes("/admin"), admin.url());
+// Wait for the redirect itself, and assert the exact path — "/admin/login"
+// also contains "/admin", so a substring check cannot tell them apart.
+await admin.waitForURL((url) => new URL(url).pathname === "/admin", { timeout: 15000 })
+  .catch(() => {});
+await admin.waitForTimeout(400);
+check("admin signs in", new URL(admin.url()).pathname === "/admin", admin.url());
 
 text = (await admin.textContent("body")) ?? "";
 check("admin sees combined pool", text.includes("$200.00"));
@@ -136,7 +172,11 @@ check("admin sees both employees", text.includes("Kyle") && text.includes("Evie"
 
 // ---------- 6. Employee cannot reach admin ----------
 await kyle.goto(BASE + "/admin", { waitUntil: "networkidle" });
-check("employee blocked from admin", !kyle.url().endsWith("/admin"), kyle.url());
+check(
+  "employee blocked from admin",
+  new URL(kyle.url()).pathname !== "/admin",
+  kyle.url(),
+);
 
 const employeeExport = await kyle.evaluate(async (base) => {
   const r = await fetch(base + "/api/export", { credentials: "same-origin" });
@@ -175,6 +215,33 @@ text = (await kyle.textContent("body")) ?? "";
 check("locked period is read-only for staff", /locked/i.test(text));
 const saveButton = await kyle.getByRole("button", { name: "Save hours" }).count();
 check("save button gone when locked", saveButton === 0);
+
+// ---------- 9. PIN management: weak rejection and leading zeros ----------
+await admin.goto(BASE + "/admin/employees", { waitUntil: "networkidle" });
+
+async function setPinFor(name, pin) {
+  const row = admin.locator("li").filter({ hasText: name }).first();
+  await row.locator('input[name="pin"]').fill(pin);
+  await row.getByRole("button", { name: "Set PIN" }).click();
+  await admin.waitForTimeout(900);
+  return (await row.textContent()) ?? "";
+}
+
+const weakResult = await setPinFor("Jonah", "123456");
+check("weak PIN refused", /too easy to guess/i.test(weakResult), weakResult.slice(-90));
+
+// A leading zero must survive the round trip — it is a string, not a number.
+const zeroResult = await setPinFor("Jonah", "083517");
+check("leading-zero PIN accepted", /PIN updated/i.test(zeroResult), zeroResult.slice(-90));
+
+const jonahCtx = await browser.newContext();
+const jonah = await jonahCtx.newPage();
+await pinLogin(jonah, "Jonah", "083517");
+check(
+  "signs in with a leading-zero PIN",
+  new URL(jonah.url()).pathname === "/entry",
+  jonah.url(),
+);
 
 console.log(`\n${pass.length} passed, ${fail.length} failed`);
 if (fail.length) { console.log("\nFailures:"); fail.forEach((f) => console.log("  " + f)); }
