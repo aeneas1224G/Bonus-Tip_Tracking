@@ -1,0 +1,217 @@
+// Vista Trail Bikes — bonus & tip tracking
+// Money is stored as INTEGER CENTS everywhere. Never floats.
+// Hours are stored as INTEGER MINUTES. Never floats.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum PayPeriodStatus {
+  OPEN
+  LOCKED
+}
+
+enum TipKind {
+  WATER
+  RESCUE
+  OTHER
+}
+
+/// Everyone who can sign in. Admins use username+password; employees use a 4-digit PIN.
+model User {
+  id       String  @id @default(cuid())
+  name     String
+  initials String?
+  role     Role    @default(EMPLOYEE)
+  active   Boolean @default(true)
+
+  // Admin auth
+  username     String? @unique
+  passwordHash String?
+
+  // Employee auth
+  pinHash String?
+
+  // Reserved for the future Gusto push — not used by the CSV export.
+  gustoEmployeeId String?
+
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+
+  shiftEntries ShiftEntry[]
+  tips         IndividualTip[]
+  closedDays   DayRecord[]     @relation("CloserOfDay")
+  auditLogs    AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, active])
+}
+
+/// A two-week pay period. Monday -> Sunday, anchored on 2026-08-10.
+model PayPeriod {
+  id        String          @id @default(cuid())
+  startDate DateTime        @db.Date
+  endDate   DateTime        @db.Date
+  status    PayPeriodStatus @default(OPEN)
+  lockedAt  DateTime?
+
+  /// Rate schedule in force for this period. Pinned at lock time so a later
+  /// rate change never rewrites a period that has already been paid.
+  rateScheduleId String?
+  rateSchedule   RateSchedule? @relation(fields: [rateScheduleId], references: [id])
+
+  /// Snapshot of the computed payout, frozen when the period is locked.
+  lockedSnapshot Json?
+
+  days DayRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([startDate])
+  @@index([status])
+}
+
+/// One calendar day of business. Holds the shared numbers that drive the pools.
+model DayRecord {
+  id          String    @id @default(cuid())
+  date        DateTime  @db.Date
+  payPeriodId String
+  payPeriod   PayPeriod @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
+
+  /// Bikes rented that day. Null = not entered yet. Drives the daily bonus pool.
+  rentalCount Int?
+
+  /// True when the shop was shut (the "x" rows in the sheet). Pool is $0.
+  closed Boolean @default(false)
+
+  /// Cumulative lifetime Google review count as read at end of day.
+  reviewCount Int?
+
+  /// Ebikes out that day. Recorded for reference; does not affect any payout.
+  ebikeCount Int?
+
+  closerId String?
+  closer   User?   @relation("CloserOfDay", fields: [closerId], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  entries ShiftEntry[]
+  tips    IndividualTip[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date])
+  @@index([payPeriodId])
+}
+
+/// One employee's hours for one day. At most one per employee per day.
+model ShiftEntry {
+  id          String    @id @default(cuid())
+  dayRecordId String
+  dayRecord   DayRecord @relation(fields: [dayRecordId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Hours worked, stored as whole minutes. 10.5 hours -> 630.
+  minutes Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dayRecordId, userId])
+  @@index([userId])
+}
+
+/// A cash tip earned by one person — water sale, rescue, etc.
+/// Paid 100% to that employee, never divided into the shared pool.
+model IndividualTip {
+  id          String    @id @default(cuid())
+  dayRecordId String
+  dayRecord   DayRecord @relation(fields: [dayRecordId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amountCents Int
+  kind        TipKind @default(OTHER)
+  note        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dayRecordId])
+  @@index([userId])
+}
+
+/// A versioned set of bonus rates. Editing rates creates a NEW schedule rather
+/// than mutating the old one, so locked periods keep the rates they were paid at.
+model RateSchedule {
+  id            String   @id @default(cuid())
+  label         String
+  effectiveFrom DateTime @db.Date
+  isCurrent     Boolean  @default(false)
+
+  rentalTiers RentalTier[]
+  reviewTiers ReviewTier[]
+  payPeriods  PayPeriod[]
+
+  createdAt DateTime @default(now())
+
+  @@index([isCurrent])
+}
+
+/// "40+ rentals = $100". minRentals is inclusive; highest matching tier wins.
+model RentalTier {
+  id             String       @id @default(cuid())
+  rateScheduleId String
+  rateSchedule   RateSchedule @relation(fields: [rateScheduleId], references: [id], onDelete: Cascade)
+
+  minRentals Int
+  bonusCents Int
+
+  @@unique([rateScheduleId, minRentals])
+}
+
+/// "75-99 reviews = $4 each". minReviews is inclusive; highest matching tier wins.
+model ReviewTier {
+  id             String       @id @default(cuid())
+  rateScheduleId String
+  rateSchedule   RateSchedule @relation(fields: [rateScheduleId], references: [id], onDelete: Cascade)
+
+  minReviews     Int
+  perReviewCents Int
+
+  @@unique([rateScheduleId, minReviews])
+}
+
+/// Every mutation of hours, tips, day numbers, rates and locks lands here.
+model AuditLog {
+  id      String  @id @default(cuid())
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  action   String
+  entity   String
+  entityId String?
+  before   Json?
+  after    Json?
+  ip       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

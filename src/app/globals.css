@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-sand text-ink antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Money and hours line up in columns when digits are tabular. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
