@@ -67,10 +67,18 @@ Everything below works and is covered by tests.
 - Payroll CSV export
 - Append-only audit log on every money-affecting write
 
-**Test coverage:** 38 unit tests (`npm test`) and a 37-check browser run
-(`tests/e2e/smoke.mjs`). The unit suite asserts parity with the owner's real
-spreadsheet: given the sheet's own $2,947 pool and 577 hours it reproduces
-Pete $924, Taylor $690, Evie $598, Kyle $659, Jonah $77 exactly.
+- Adding, deactivating and reactivating staff, with no fixed crew size
+- Importing a pay period from a spreadsheet CSV
+
+**Test coverage:** 59 unit tests (`npm test`) and a 49-check browser run
+(`tests/e2e/smoke.mjs`).
+
+**The 8/10–8/23 period has been imported and checked against what was actually
+paid.** The app produces $3,320 against the sheet's $3,316. The tip share matches
+the sheet's daily column to within about a dollar per person; what remains is the
+review bonus, where the sheet's hours column credited Taylor 135 hours and Kyle 129
+against the 69 and 46 they logged. The residual $4 is the sheet rounding its own
+cells by hand. **The engine is the more accurate of the two.**
 
 ---
 
@@ -79,7 +87,6 @@ Pete $924, Taylor $690, Evie $598, Kyle $659, Jonah $77 exactly.
 - **Not deployed.** No Vercel project, no production database, no live URL. This is
   the main thing standing between the app and real use.
 - **No Gusto API push.** CSV only.
-- **No historical import.** The 8/10–8/23 period from the sheet has not been loaded.
 - **No trends dashboard, no missing-entry alerts.** Both were offered and deferred.
 
 ---

@@ -276,6 +276,60 @@ check(
   taylor.url(),
 );
 
+// ---------- 10. Hiring for peak season ----------
+await admin.goto(BASE + "/admin/employees", { waitUntil: "networkidle" });
+
+const hire = async (name, initials, pin) => {
+  const form = admin.locator("form").filter({ hasText: "Add employee" });
+  await form.locator('input[name="name"]').fill(name);
+  await form.locator('input[name="initials"]').fill(initials);
+  await form.locator('input[name="pin"]').fill(pin);
+  await form.getByRole("button", { name: "Add employee" }).click();
+  await admin.waitForTimeout(1000);
+};
+
+await hire("Marisol", "mv", "628194");
+await hire("Devon", "dh", "471903");
+await hire("Priya", "pk", "350862");
+
+const rosterText = (await admin.textContent("body")) ?? "";
+check(
+  "three seasonal hires added through the UI",
+  ["Marisol", "Devon", "Priya"].every((n) => rosterText.includes(n)),
+);
+
+// A duplicate name should be refused rather than creating a second account.
+await hire("Marisol", "mv", "915374");
+check(
+  "duplicate name refused",
+  /already on the roster/i.test((await admin.textContent("body")) ?? ""),
+);
+
+// A new hire appears on the sign-in screen and can actually get in.
+const hireCtx = await browser.newContext();
+const marisol = await hireCtx.newPage();
+await marisol.goto(BASE + "/", { waitUntil: "networkidle" });
+check(
+  "new hire appears on the name picker",
+  (await marisol.textContent("body"))?.includes("Marisol") ?? false,
+);
+await pinLogin(marisol, "Marisol", "628194");
+check(
+  "new hire signs in with her own PIN",
+  new URL(marisol.url()).pathname === "/entry",
+  marisol.url(),
+);
+
+// Seven on the roster, and a deactivated one drops off the picker.
+await admin.goto(BASE + "/admin/employees", { waitUntil: "networkidle" });
+const devonRow = admin.locator("li").filter({ hasText: "Devon" }).first();
+await devonRow.getByRole("button", { name: "Deactivate" }).click();
+await admin.waitForTimeout(1000);
+await marisol.goto(BASE + "/", { waitUntil: "networkidle" });
+const picker = (await marisol.textContent("body")) ?? "";
+check("deactivated employee leaves the name picker", !picker.includes("Devon"));
+check("everyone else stays", picker.includes("Marisol") && picker.includes("Priya"));
+
 console.log(`\n${pass.length} passed, ${fail.length} failed`);
 if (fail.length) { console.log("\nFailures:"); fail.forEach((f) => console.log("  " + f)); }
 await browser.close();

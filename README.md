@@ -165,12 +165,49 @@ Generate a session secret with `openssl rand -base64 32`.
 3. Push. The build runs `prisma generate` automatically.
 4. Run `npm run db:push && npm run db:seed` once against the production database.
 
+## Adding and removing staff
+
+**Admin → Employees.** Add someone with a name and a 6-digit PIN and they appear on
+the sign-in screen immediately — no deploy, no config change. Deactivate them when
+the season ends and they drop off the picker while keeping every hour and dollar
+they earned. Duplicate names are refused so nobody ends up with two accounts.
+
+Crew size is not fixed anywhere. `tests/scale.test.ts` runs the split for every
+crew size from 1 to 20 with deliberately awkward quarter-hour shifts and asserts
+the day's shares still sum to exactly the day's pool. It also covers seasonals
+joining mid-period, which the day-by-day split handles on its own: they share only
+the days they actually worked.
+
+## Loading a period from the spreadsheet
+
+```bash
+# Sheets: File > Download > Comma-separated values
+npx tsx scripts/import-sheet.ts period.csv --dry-run     # parse and report only
+npx tsx scripts/import-sheet.ts period.csv --with-tips   # write it
+```
+
+The importer reads the (Hrs, Name) column pairs off the header rather than assuming
+fixed positions, so a tab with a different crew parses with the same code. Anyone in
+the sheet who is not on the roster is created as an **inactive** account with no PIN
+— their history has somewhere to attach without granting them a login.
+
+`--with-tips` also creates the cash tips implied by the gap between the sheet's
+dollar cell and the pro-rata share. Those are derived, not read from a column, and
+each one says so in its note.
+
 ## Tests
 
 ```bash
-npm test          # 27 unit tests — the payout engine against the real sheet numbers
+npm test          # 59 unit tests
 npm run typecheck
 ```
+
+`tests/sheet-parity.test.ts` is the one worth understanding. Every other test runs
+against a hand-transcribed fixture of the 8/10–8/23 period — so if that
+transcription were wrong, those tests would be wrong with it and still pass. This
+file re-parses the sheet's own CSV by machine and compares the two, cell by cell:
+every rental count, every hours cell, every dollar cell, both review readings. It
+is the only thing standing between a typo and a wrong paycheque.
 
 `tests/e2e/smoke.mjs` is a browser test covering sign-in, entry, pool splitting,
 role separation, CSV export and locking. It needs a running server and a scratch
