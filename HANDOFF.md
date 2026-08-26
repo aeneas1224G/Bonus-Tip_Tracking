@@ -1,11 +1,52 @@
 # Handoff — where this project stands
 
-Last updated: 2026-08-24. Branch: `claude/employee-bonus-tracking-app-xecoap`.
+Last updated: 2026-08-26. Production branch: `claude/employee-bonus-tracking-app-xecoap`.
+
+> **The app is LIVE and holds real data.** Read "Live status" below before changing
+> anything. The database can no longer be wiped and recreated.
 
 Read this first if you are picking the project up cold. `README.md` explains how the
 app works; this file explains what has been decided, what is done, and what is next.
 
 ---
+
+## Live status
+
+Deployed 2026-08-26. Setup was completed by the owner, so an owner account and the
+2026 rate ladders exist in production.
+
+| | |
+| --- | --- |
+| Hosting | Vercel project `vtb-bonus-tip-tracking` |
+| Database | Neon, project `vista-bonus`, region us-west-2 |
+| Production branch | `claude/employee-bonus-tracking-app-xecoap` — every push deploys |
+| Owner sign-in | `/admin/login`. There is no password reset by design. |
+| Staff sign-in | the site root — tap a name, enter a 6-digit PIN |
+
+**Working agreement, set 2026-08-26: no more pushing straight to production.**
+Changes go on a branch, open a pull request against the production branch, the owner
+reviews it on the Vercel preview, and only then is it merged. Merging is what
+deploys.
+
+**A preview very likely shares the production database.** The four environment
+variables were added during project creation, which applies them to Preview as well
+as Production. This has not been confirmed — it could not be checked from the dev
+sandbox, which cannot reach the vercel.app host. Treat any write made on a preview
+as real until someone verifies otherwise. If separate preview data is wanted, add a
+second Neon database and scope `DATABASE_URL` to the Preview environment only.
+
+### In flight
+
+**PR #1 — "Sign in with an email address, and change it from an Account page"**
+(branch `claude/admin-email-username`). Built, tested, pushed, preview deployed.
+Waiting on the owner to look at the preview. Nothing is merged.
+
+Preview:
+`https://vtb-bonus-tip-tracking-git-claude-admin-e-f1a124-admin-65882310.vercel.app`
+
+The owner was asked to stop short of completing an actual rename on the preview,
+precisely because of the shared-database question above. The plan is: merge first,
+then rename once on the live site.
 
 ## The goal
 
@@ -38,6 +79,7 @@ These came out of an interview with the owner. Do not re-litigate them without a
 | Timezone | **America/Los_Angeles** (Pacific). |
 | Locking a period with an unpaid day | **Blocked.** A day with hours but no rental count refuses the lock. |
 | Production bootstrap | **Browser-based `/setup`**, gated by `SETUP_TOKEN`, closes permanently once an owner exists. No CLI against production. |
+| Owner sign-in name | **Email addresses allowed**, stored lowercased, matched case-insensitively. In PR #1, not yet merged. |
 | Edit window | Employee may edit **their own entry, same day only**. Owner edits anything until the period is locked. |
 | Visibility | **Everyone sees everything** — any employee can view the full period sheet. |
 | Bonus rate ladders | **Editable by the owner** in Admin → Bonus rates, and versioned. |
@@ -85,11 +127,14 @@ cells by hand. **The engine is the more accurate of the two.**
 
 ## What is NOT done
 
-- **Not deployed yet**, but everything needed is in place: migrations, an automatic
-  `migrate deploy` in the build, a browser-based `/setup` page so production never
-  needs a seed script, and `DEPLOY.md` written for someone who does not want a
-  terminal. The owner has chosen to deploy; walking them through it is the next
-  action.
+- **No Gusto API push.** The CSV export is the payroll handoff. `gustoEmployeeId`
+  exists on `User` for whenever it is built.
+- **No password change screen.** Offered when PR #1 was built and deliberately left
+  out to keep that change to what was asked for. There is currently no way for the
+  owner to rotate their own password from inside the app.
+- **Only the 8/10–8/23 period has ever been imported**, and only into a local
+  database, never production. `scripts/import-sheet.ts` does it.
+- **No trends dashboard, no missing-entry alerts.** Both offered and deferred.
 - **No Gusto API push.** CSV only.
 - **No trends dashboard, no missing-entry alerts.** Both were offered and deferred.
 
@@ -103,17 +148,22 @@ one or two at a time rather than as a block.
 1. **Deployment** — do they want to be walked through Neon + Vercel, or do it themselves?
 2. **A "Ted"** appears in an 8/17 rescue note with no column of his own. Not on the
    roster; never clarified who he is.
-3. **Edit window length** — the timezone is settled (Pacific), but not whether the
-   window should close at local midnight (what is built) or carry a grace period to
-   ~3am for someone closing late. Ask when convenient; it is a one-line change.
+3. **Edit window** — SETTLED 2026-08-26. Local midnight is fine; the owner can
+   correct any day themselves while the period is open, which covers the real case.
 4. **The sheet's 577-hour figure** was declared stale by the owner and is ignored.
    All logged hours count toward bonus; there is no separate non-bonus hours bucket.
 4. **What to build next** — historical import, Gusto API, alerts, or dashboard.
 
-The recommendation given, and still the right one: **load the 8/10–8/23 period from the
-sheet and compare the app's numbers against what was actually paid** before this runs
-real payroll. The parity is already asserted in a test, but the owner should see it
-against their own data.
+That verification is DONE. The period was imported and compared: the app produced
+$3,320 against the $3,316 actually paid, with the difference traced to the sheet's
+own hand-rounding and to its review-hours column being wrong. See the commit
+"Import the 8/10-8/23 period from the sheet and verify against what was paid".
+
+**What has not happened yet is a real pay period running through the live app.**
+The owner was advised to log a couple of real shifts and let a full period run
+before relying on it for payroll — not for the arithmetic, which is checked cell by
+cell, but to surface workflow problems that cannot be predicted from outside the
+shop.
 
 ---
 

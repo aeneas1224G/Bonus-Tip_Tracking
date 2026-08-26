@@ -1,5 +1,10 @@
 # Vista Trail Bikes — bonus & tip tracking
 
+**This app is LIVE and holds real payroll data.** Changes go on a branch and through
+a pull request for the owner to preview — never straight to the production branch
+`claude/employee-bonus-tracking-app-xecoap`, which deploys on every push. Never drop
+or recreate the production database.
+
 **Read `HANDOFF.md` first.** It carries the decisions already made with the owner, what
 is built, what is not, and the questions still open. `README.md` explains how the app
 works and how the money is calculated.
