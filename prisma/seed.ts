@@ -33,14 +33,19 @@ const REVIEW_TIERS: Array<[number, number]> = [
   [150, 7_00],
 ];
 
+/**
+ * The current roster, confirmed with the owner on 2026-08-25.
+ *
+ * Jonah, Brecklyn and Adrian appear in the 8/10-8/23 spreadsheet but have
+ * since left. They are deliberately not seeded. If that period is ever
+ * imported, the import needs to create them as INACTIVE accounts so their
+ * historical hours and pay have somewhere to attach without granting a login.
+ */
 const STAFF: Array<{ name: string; initials: string }> = [
   { name: "Pete", initials: "pt" },
   { name: "Taylor", initials: "ta" },
   { name: "Kyle", initials: "kd" },
   { name: "Evie", initials: "ek" },
-  { name: "Jonah", initials: "jo" },
-  { name: "Brecklyn", initials: "br" },
-  { name: "Adrian", initials: "ad" },
 ];
 
 /**

@@ -202,8 +202,41 @@ const [download] = await Promise.all([
 ]);
 check("CSV download link works", !!download, download ? await download.suggestedFilename() : "no download");
 
-// ---------- 8. Lock the period ----------
+// ---------- 7b. The lock guard ----------
+// Give an earlier day hours but no rental count. Under day-by-day splitting
+// that day pays everyone $0, so locking must refuse.
 admin.on("dialog", (dialog) => dialog.accept());
+
+const guardDate = "2026-08-25"; // inside the current period, not today
+await admin.goto(`${BASE}/admin/day?date=${guardDate}`, { waitUntil: "networkidle" });
+const kyleBlock = admin.locator("div").filter({ hasText: /^Kyle/ }).last();
+await kyleBlock.locator('input[name="hours"]').fill("6");
+await kyleBlock.getByRole("button", { name: "Save hours" }).click();
+await admin.waitForTimeout(900);
+check(
+  "admin can add hours to an earlier day",
+  /Hours saved/i.test((await admin.textContent("body")) ?? ""),
+);
+
+await admin.goto(BASE + "/admin", { waitUntil: "networkidle" });
+await admin.getByRole("button", { name: /Lock period/i }).click();
+await admin.waitForTimeout(1200);
+let guardText = (await admin.textContent("body")) ?? "";
+check("locking is blocked by the unpaid day", /Cannot lock yet/i.test(guardText));
+check("the block names the day", /8\/25\/26/.test(guardText), guardText.slice(0, 0));
+check("the block says who is affected", /would earn \$0/i.test(guardText));
+check("period did not lock", /Open|provisional/i.test(guardText));
+
+// Fix it the way the owner would: mark the day closed.
+await admin.goto(`${BASE}/admin/day?date=${guardDate}`, { waitUntil: "networkidle" });
+await admin.locator('input[name="closed"]').check();
+await admin.getByRole("button", { name: "Save day" }).click();
+await admin.waitForTimeout(900);
+check("day marked closed", /Day saved/i.test((await admin.textContent("body")) ?? ""));
+
+await admin.goto(BASE + "/admin", { waitUntil: "networkidle" });
+
+// ---------- 8. Lock the period ----------
 await admin.getByRole("button", { name: /Lock period/i }).click();
 await admin.waitForLoadState("networkidle");
 await admin.waitForTimeout(600);
@@ -227,20 +260,20 @@ async function setPinFor(name, pin) {
   return (await row.textContent()) ?? "";
 }
 
-const weakResult = await setPinFor("Jonah", "123456");
+const weakResult = await setPinFor("Taylor", "123456");
 check("weak PIN refused", /too easy to guess/i.test(weakResult), weakResult.slice(-90));
 
 // A leading zero must survive the round trip — it is a string, not a number.
-const zeroResult = await setPinFor("Jonah", "083517");
+const zeroResult = await setPinFor("Taylor", "083517");
 check("leading-zero PIN accepted", /PIN updated/i.test(zeroResult), zeroResult.slice(-90));
 
-const jonahCtx = await browser.newContext();
-const jonah = await jonahCtx.newPage();
-await pinLogin(jonah, "Jonah", "083517");
+const taylorCtx = await browser.newContext();
+const taylor = await taylorCtx.newPage();
+await pinLogin(taylor, "Taylor", "083517");
 check(
   "signs in with a leading-zero PIN",
-  new URL(jonah.url()).pathname === "/entry",
-  jonah.url(),
+  new URL(taylor.url()).pathname === "/entry",
+  taylor.url(),
 );
 
 console.log(`\n${pass.length} passed, ${fail.length} failed`);

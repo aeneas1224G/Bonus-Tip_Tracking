@@ -2,8 +2,10 @@
  * Pay periods are 14 days, Monday -> Sunday, anchored on 2026-08-10 —
  * the first day of the earliest period in the source spreadsheet.
  *
- * Dates are handled as UTC midnight throughout so a shop in Mountain Time
- * never sees a shift land in the wrong period because of a timezone offset.
+ * Dates are handled as UTC midnight throughout so the shop, which is on
+ * Pacific time, never sees a shift land in the wrong period because of a
+ * timezone offset. Which calendar day an entry belongs to is decided by
+ * SHOP_TIMEZONE, not by the server's clock.
  */
 
 export const PERIOD_LENGTH_DAYS = 14;
@@ -81,7 +83,9 @@ export function periodLabel(bounds: Pick<PeriodBounds, "startDate" | "endDate">)
 }
 
 /** Today's date in the shop's timezone, as an ISO date string. */
-export function todayISO(timeZone = process.env.SHOP_TIMEZONE ?? "America/Denver"): string {
+export function todayISO(
+  timeZone = process.env.SHOP_TIMEZONE ?? "America/Los_Angeles",
+): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",

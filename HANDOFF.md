@@ -33,6 +33,10 @@ These came out of an interview with the owner. Do not re-litigate them without a
 | Employee login | **PIN only, no shared password.** Owner uses username + password. |
 | PIN length | **6 digits** (raised from 4 at the owner's request, 2026-08-24). |
 | Hosting target | **Vercel + hosted Postgres** (Neon or Vercel Postgres). |
+| Does the owner work shifts? | **No.** The owner account cannot log hours at all, enforced server-side, so it can never dilute the pool. |
+| Roster | **Pete, Taylor, Kyle, Evie only** (confirmed 2026-08-25). Jonah, Brecklyn and Adrian appear in the sheet but have left and are not seeded. |
+| Timezone | **America/Los_Angeles** (Pacific). |
+| Locking a period with an unpaid day | **Blocked.** A day with hours but no rental count refuses the lock. |
 | Edit window | Employee may edit **their own entry, same day only**. Owner edits anything until the period is locked. |
 | Visibility | **Everyone sees everything** — any employee can view the full period sheet. |
 | Bonus rate ladders | **Editable by the owner** in Admin → Bonus rates, and versioned. |
@@ -72,7 +76,8 @@ Pete $924, Taylor $690, Evie $598, Kyle $659, Jonah $77 exactly.
 
 ## What is NOT done
 
-- **Not deployed.** No Vercel project, no production database, no live URL.
+- **Not deployed.** No Vercel project, no production database, no live URL. This is
+  the main thing standing between the app and real use.
 - **No Gusto API push.** CSV only.
 - **No historical import.** The 8/10–8/23 period from the sheet has not been loaded.
 - **No trends dashboard, no missing-entry alerts.** Both were offered and deferred.
@@ -85,12 +90,12 @@ Asked on 2026-08-24 and dismissed rather than answered. Ask again when it is use
 one or two at a time rather than as a block.
 
 1. **Deployment** — do they want to be walked through Neon + Vercel, or do it themselves?
-2. **Roster** — the seed installs Pete, Taylor, Kyle, Evie, Jonah, Brecklyn, Adrian from
-   names found in the sheet. Nobody has confirmed who is current. A "Ted" also appears in
-   an 8/17 rescue note with no column of his own.
-3. **Day boundary** — employees can edit until local midnight, timezone defaulted to
-   `America/Denver`. Neither the boundary nor the timezone is confirmed.
-5. **The sheet's 577-hour figure** was declared stale by the owner and is ignored.
+2. **A "Ted"** appears in an 8/17 rescue note with no column of his own. Not on the
+   roster; never clarified who he is.
+3. **Edit window length** — the timezone is settled (Pacific), but not whether the
+   window should close at local midnight (what is built) or carry a grace period to
+   ~3am for someone closing late. Ask when convenient; it is a one-line change.
+4. **The sheet's 577-hour figure** was declared stale by the owner and is ignored.
    All logged hours count toward bonus; there is no separate non-bonus hours bucket.
 4. **What to build next** — historical import, Gusto API, alerts, or dashboard.
 

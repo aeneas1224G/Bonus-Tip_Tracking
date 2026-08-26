@@ -7,7 +7,7 @@ import { recordAudit } from "@/lib/audit";
 import { hashSecret, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseDollarsToCents } from "@/lib/money";
-import { parseISODate, periodForDate } from "@/lib/payPeriod";
+import { parseISODate, periodForDate, shortDateLabel } from "@/lib/payPeriod";
 import { checkPin, PIN_FORMAT_MESSAGE, PIN_PATTERN, PIN_WEAK_MESSAGE } from "@/lib/pin";
 import { loadPeriod } from "@/lib/periods";
 import type { ActionState } from "./auth";
@@ -260,11 +260,36 @@ export async function lockPeriod(_prev: ActionState, formData: FormData): Promis
     const bounds = periodForDate(startDate);
     const loaded = await loadPeriod(bounds);
 
-    const blocking = loaded.result.warnings.filter(
+    // A day with hours but no rental count pays everyone who worked it $0.
+    // Under day-by-day splitting that is silent and irreversible once locked,
+    // so it blocks the lock rather than merely warning.
+    const unpaidDays = loaded.result.days.filter(
+      (day) => !day.closed && day.rentalCount === null && day.minutes > 0,
+    );
+    if (unpaidDays.length > 0) {
+      const detail = unpaidDays
+        .slice(0, 5)
+        .map(
+          (day) =>
+            `${shortDateLabel(day.date)} (${(day.minutes / 60).toFixed(1)} hrs across ` +
+            `${day.staffCount} ${day.staffCount === 1 ? "person" : "people"})`,
+        )
+        .join(", ");
+      const more = unpaidDays.length > 5 ? ` and ${unpaidDays.length - 5} more` : "";
+      return {
+        error:
+          `Cannot lock yet. ${unpaidDays.length} ${unpaidDays.length === 1 ? "day has" : "days have"} ` +
+          `hours logged but no rental count, so everyone who worked would earn $0 for ${
+            unpaidDays.length === 1 ? "it" : "them"
+          }: ${detail}${more}. Enter the rentals, or mark the day closed, then lock.`,
+      };
+    }
+
+    const backwardReviews = loaded.result.warnings.filter(
       (warning) => warning.code === "REVIEW_COUNT_WENT_BACKWARD",
     );
-    if (blocking.length > 0) {
-      return { error: `${blocking[0].message} Fix that before locking.` };
+    if (backwardReviews.length > 0) {
+      return { error: `${backwardReviews[0].message} Fix that before locking.` };
     }
 
     const currentSchedule = await db.rateSchedule.findFirst({ where: { isCurrent: true } });

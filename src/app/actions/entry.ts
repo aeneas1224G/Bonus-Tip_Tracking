@@ -64,6 +64,18 @@ export async function saveShift(_prev: ActionState, formData: FormData): Promise
     const { date, userId, hours } = parsed.data;
     const { session } = await assertWritable(date, userId);
 
+    // The owner does not take shifts and does not share in the pool. The UI
+    // never offers it, but an admin could otherwise post a shift for their own
+    // account and quietly dilute everyone's split.
+    const target = await db.user.findUnique({
+      where: { id: userId },
+      select: { role: true, active: true, name: true },
+    });
+    if (!target) return { error: "That employee no longer exists." };
+    if (target.role !== "EMPLOYEE") {
+      return { error: "Only employees log hours. The owner does not share in the bonus pool." };
+    }
+
     const minutes = parseHoursToMinutes(hours);
     if (minutes === null) {
       return { error: "Enter hours as a number, like 8 or 7.5." };
@@ -236,6 +248,14 @@ export async function addTip(_prev: ActionState, formData: FormData): Promise<Ac
 
     const { date, userId, kind, note } = parsed.data;
     const { session } = await assertWritable(date, userId);
+
+    const target = await db.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (target?.role !== "EMPLOYEE") {
+      return { error: "Cash tips can only be credited to an employee." };
+    }
 
     const amountCents = parseDollarsToCents(parsed.data.amount);
     if (amountCents === null || amountCents <= 0) {

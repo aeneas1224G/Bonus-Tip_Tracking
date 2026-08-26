@@ -282,6 +282,45 @@ describe("guard rails", () => {
   });
 });
 
+describe("the lock guard's condition", () => {
+  // lockPeriod refuses on exactly this shape, so pin down how the engine
+  // reports it. If this changes, the guard silently stops guarding.
+  const unpaidDays = (result: ReturnType<typeof calculatePeriod>) =>
+    result.days.filter((day) => !day.closed && day.rentalCount === null && day.minutes > 0);
+
+  it("finds nothing to block on a complete period", () => {
+    expect(unpaidDays(august())).toHaveLength(0);
+  });
+
+  it("catches a day where hours were logged but the rental count never was", () => {
+    const days = buildAugustPeriod().map((day) =>
+      day.date === "2026-08-14" ? { ...day, rentalCount: null } : day,
+    );
+    const result = calculatePeriod({ ...base, days });
+    const blocked = unpaidDays(result);
+
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0].date).toBe("2026-08-14");
+    expect(blocked[0].staffCount).toBe(3);
+    expect(blocked[0].minutes / 60).toBe(27);
+    // Three people would silently earn nothing for a day they worked.
+    expect(blocked[0].shares.every((share) => share.shareCents === 0)).toBe(true);
+  });
+
+  it("does not block on a closed day, which is meant to pay nothing", () => {
+    // 8/15 has 4 hours logged and no rental count, but it is marked closed.
+    expect(august().days.find((d) => d.date === "2026-08-15")!.closed).toBe(true);
+    expect(unpaidDays(august())).toHaveLength(0);
+  });
+
+  it("does not block on a day nobody worked", () => {
+    const days = buildAugustPeriod().map((day) =>
+      day.date === "2026-08-14" ? { ...day, rentalCount: null, entries: [] } : day,
+    );
+    expect(unpaidDays(calculatePeriod({ ...base, days }))).toHaveLength(0);
+  });
+});
+
 describe("allocateByWeight", () => {
   it("splits an indivisible pool without losing a cent", () => {
     const shares = allocateByWeight(10_000, [

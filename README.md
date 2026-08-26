@@ -126,6 +126,12 @@ Fourteen days, Monday through Sunday, anchored on **2026-08-10** — the first p
 in the spreadsheet. Every period since lines up with it automatically; there is
 nothing to roll over by hand.
 
+Which calendar day an entry lands on is decided by `SHOP_TIMEZONE`, set to
+`America/Los_Angeles`, not by the server's clock.
+
+Locking is refused while any day has hours logged but no rental count — under
+day-by-day splitting that would silently pay everyone who worked that day $0.
+
 ## Payroll handoff
 
 **Admin → Download payroll CSV** gives one row per employee — hours, tip share,
