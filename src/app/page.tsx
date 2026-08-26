@@ -4,10 +4,15 @@ import Link from "next/link";
 import { PinPad } from "@/components/PinPad";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { adminExists } from "@/lib/setup";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  // A freshly deployed instance has nobody in it; send the first visitor to setup
+  // rather than to a name picker with no names on it.
+  if (!(await adminExists())) redirect("/setup");
+
   const session = await getSession();
   if (session?.role === "ADMIN") redirect("/admin");
   if (session?.role === "EMPLOYEE") redirect("/entry");

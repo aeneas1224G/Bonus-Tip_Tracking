@@ -147,23 +147,31 @@ A direct Gusto API push is not built yet, but the data model carries a
 ```bash
 npm install
 cp .env.example .env          # then fill in DATABASE_URL and SESSION_SECRET
-npm run db:push               # create the tables
+npm run db:deploy             # create the tables
 npm run db:seed               # owner account, 2026 rate ladders, staff roster + PINs
 npm run dev
 ```
+
+`db:seed` is a convenience for local work only. A deployed instance uses the
+`/setup` page instead and never runs it.
 
 `db:seed` prints a starter PIN for each employee once. Hand them out, then change
 them under Admin → Employees.
 
 Generate a session secret with `openssl rand -base64 32`.
 
-### Deploying to Vercel
+### Deploying
 
-1. Create a Postgres database (Neon, Vercel Postgres or Supabase).
-2. Set `DATABASE_URL`, `SESSION_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` and
-   `SHOP_TIMEZONE` in the Vercel project's environment variables.
-3. Push. The build runs `prisma generate` automatically.
-4. Run `npm run db:push && npm run db:seed` once against the production database.
+**See `DEPLOY.md`** — step by step, browser only, no terminal.
+
+In short: set `DATABASE_URL`, `SESSION_SECRET`, `SETUP_TOKEN` and `SHOP_TIMEZONE`,
+then push. The build runs `prisma migrate deploy`, so the schema applies itself on
+every deploy. The first visit lands on `/setup`, where the owner account and the
+bonus ladders are created in the browser — production never needs a seed script.
+
+`/setup` closes permanently once an owner exists, and refuses to do anything
+without `SETUP_TOKEN`, so nobody can claim the instance in the gap between the
+deploy finishing and you reaching it.
 
 ## Adding and removing staff
 

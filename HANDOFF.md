@@ -37,6 +37,7 @@ These came out of an interview with the owner. Do not re-litigate them without a
 | Roster | **Pete, Taylor, Kyle, Evie only** (confirmed 2026-08-25). Jonah, Brecklyn and Adrian appear in the sheet but have left and are not seeded. |
 | Timezone | **America/Los_Angeles** (Pacific). |
 | Locking a period with an unpaid day | **Blocked.** A day with hours but no rental count refuses the lock. |
+| Production bootstrap | **Browser-based `/setup`**, gated by `SETUP_TOKEN`, closes permanently once an owner exists. No CLI against production. |
 | Edit window | Employee may edit **their own entry, same day only**. Owner edits anything until the period is locked. |
 | Visibility | **Everyone sees everything** — any employee can view the full period sheet. |
 | Bonus rate ladders | **Editable by the owner** in Admin → Bonus rates, and versioned. |
@@ -84,8 +85,11 @@ cells by hand. **The engine is the more accurate of the two.**
 
 ## What is NOT done
 
-- **Not deployed.** No Vercel project, no production database, no live URL. This is
-  the main thing standing between the app and real use.
+- **Not deployed yet**, but everything needed is in place: migrations, an automatic
+  `migrate deploy` in the build, a browser-based `/setup` page so production never
+  needs a seed script, and `DEPLOY.md` written for someone who does not want a
+  terminal. The owner has chosen to deploy; walking them through it is the next
+  action.
 - **No Gusto API push.** CSV only.
 - **No trends dashboard, no missing-entry alerts.** Both were offered and deferred.
 

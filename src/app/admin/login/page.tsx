@@ -3,10 +3,13 @@ import { redirect } from "next/navigation";
 
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { getSession } from "@/lib/auth";
+import { adminExists } from "@/lib/setup";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLoginPage() {
+  if (!(await adminExists())) redirect("/setup");
+
   const session = await getSession();
   if (session?.role === "ADMIN") redirect("/admin");
 
