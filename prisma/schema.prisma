@@ -165,6 +165,10 @@ model RateSchedule {
   effectiveFrom DateTime @db.Date
   isCurrent     Boolean  @default(false)
 
+  /// Standard payout for a trail rescue. Every rescue in the source
+  /// spreadsheet paid exactly this, so it is offered as a one-tap default.
+  rescueDefaultCents Int @default(2500)
+
   rentalTiers RentalTier[]
   reviewTiers ReviewTier[]
   payPeriods  PayPeriod[]

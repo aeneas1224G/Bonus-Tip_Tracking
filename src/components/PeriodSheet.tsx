@@ -36,12 +36,14 @@ export function PoolSummary({ result }: { result: CalcResult }) {
         <Stat
           label="Total hours"
           value={minutesToHours(result.totalMinutes).toFixed(2)}
-          hint="The divisor for both pools"
+          hint="Across the whole period"
         />
         <Stat
           label="Combined pool"
           value={formatCents(result.totalPoolCents)}
-          hint={`${formatCents(result.tipRatePerHourCents + result.reviewRatePerHourCents)}/hr`}
+          hint={`averages ${formatCents(
+            result.averageTipRatePerHourCents + result.reviewRatePerHourCents,
+          )}/hr`}
           emphasis
         />
       </dl>
@@ -143,7 +145,10 @@ export function PayoutTable({
 
 export function DayTable({ result }: { result: CalcResult }) {
   return (
-    <Card title="Day by day" description="Each open day's rentals and the pool they earned.">
+    <Card
+      title="Day by day"
+      description="Each day's pool is split among only the people who worked that day, so the rate per hour moves with how busy the day was."
+    >
       <div className="-mx-4 overflow-x-auto px-4">
         <table className="w-full min-w-[28rem] text-sm">
           <thead>
@@ -152,7 +157,8 @@ export function DayTable({ result }: { result: CalcResult }) {
               <th className="py-2 pr-3 text-right font-medium">Rentals</th>
               <th className="py-2 pr-3 text-right font-medium">Pool</th>
               <th className="py-2 pr-3 text-right font-medium">Hours</th>
-              <th className="py-2 text-right font-medium">Staff</th>
+              <th className="py-2 pr-3 text-right font-medium">Rate/hr</th>
+              <th className="py-2 text-right font-medium">Who worked</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink/10">
@@ -171,7 +177,12 @@ export function DayTable({ result }: { result: CalcResult }) {
                 <td className="tabular py-2 pr-3 text-right">
                   {minutesToHours(day.minutes).toFixed(2)}
                 </td>
-                <td className="tabular py-2 text-right">{day.staffCount || "—"}</td>
+                <td className="py-2 pr-3 text-right">
+                  {day.ratePerHourCents > 0 ? <Money cents={day.ratePerHourCents} /> : "—"}
+                </td>
+                <td className="py-2 text-right text-xs text-ink/60">
+                  {day.staffCount || "—"}
+                </td>
               </tr>
             ))}
           </tbody>

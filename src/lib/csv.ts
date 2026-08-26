@@ -82,8 +82,16 @@ export function payrollCsv(input: {
   lines.push(row(["Rate per review", dollars(result.reviewRateCents)]));
   lines.push(row(["Review bonus pool", dollars(result.reviewPoolCents)]));
   lines.push(row(["Total hours", minutesToHours(result.totalMinutes).toFixed(2)]));
-  lines.push(row(["Tip rate per hour", dollars(result.tipRatePerHourCents)]));
+  lines.push(row(["Average tip rate per hour", dollars(result.averageTipRatePerHourCents)]));
   lines.push(row(["Review rate per hour", dollars(result.reviewRatePerHourCents)]));
+  lines.push(
+    row([
+      "Note",
+      "Each day's bonus pool is split among only the people who worked that day, by their hours. " +
+        "The average above is a headline figure; no single day paid exactly that rate. " +
+        "The review bonus is a period figure and is split across all period hours.",
+    ]),
+  );
 
   if (result.warnings.length > 0) {
     lines.push("");
@@ -92,7 +100,7 @@ export function payrollCsv(input: {
   }
 
   lines.push("");
-  lines.push(row(["Day", "Rentals", "Pool", "Hours", "Staff"]));
+  lines.push(row(["Day", "Rentals", "Pool", "Hours", "Staff", "Rate/hr"]));
   for (const day of result.days) {
     lines.push(
       row([
@@ -101,8 +109,25 @@ export function payrollCsv(input: {
         dollars(day.poolCents),
         minutesToHours(day.minutes).toFixed(2),
         day.staffCount,
+        dollars(day.ratePerHourCents),
       ]),
     );
+  }
+
+  // Per-person, per-day, so the owner can audit any single cell.
+  lines.push("");
+  lines.push(row(["Day", "Employee", "Hours", "Share of that day's pool"]));
+  for (const day of result.days) {
+    for (const share of day.shares) {
+      lines.push(
+        row([
+          shortDateLabel(day.date),
+          employeeNames.get(share.userId) ?? share.userId,
+          minutesToHours(share.minutes).toFixed(2),
+          dollars(share.shareCents),
+        ]),
+      );
+    }
   }
 
   return lines.join("\r\n");

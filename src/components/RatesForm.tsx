@@ -22,9 +22,11 @@ const rateInput =
 export function RatesForm({
   rentalTiers,
   reviewTiers,
+  rescueDefaultCents,
 }: {
   rentalTiers: Array<{ minRentals: number; bonusCents: number }>;
   reviewTiers: Array<{ minReviews: number; perReviewCents: number }>;
+  rescueDefaultCents: number;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveRates, {});
   const dollars = (cents: number) => (cents / 100).toFixed(2);
@@ -82,6 +84,26 @@ export function RatesForm({
             </label>
           ))}
         </div>
+      </div>
+
+      <div>
+        <h3 className="mb-1 font-medium">Rescue payout</h3>
+        <p className="mb-3 text-sm text-ink/60">
+          What the one-tap Rescue button fills in. Paid entirely to whoever did the rescue —
+          it never enters the shared pool.
+        </p>
+        <label className="flex max-w-xs items-center justify-between gap-3">
+          <span className="text-sm">Per rescue</span>
+          <span className="flex items-center gap-1">
+            <span className="text-ink/50">$</span>
+            <input
+              name="rescueDefault"
+              defaultValue={dollars(rescueDefaultCents)}
+              inputMode="decimal"
+              className={rateInput}
+            />
+          </span>
+        </label>
       </div>
 
       <Submit />

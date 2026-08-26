@@ -199,6 +199,12 @@ export async function saveRates(_prev: ActionState, formData: FormData): Promise
       return { error: "Both ladders need at least one tier." };
     }
 
+    const rescueRaw = formData.get("rescueDefault")?.toString() ?? "";
+    const rescueDefaultCents = parseDollarsToCents(rescueRaw);
+    if (rescueDefaultCents === null || rescueDefaultCents < 0) {
+      return { error: "The rescue payout needs a dollar amount, like 25." };
+    }
+
     const previous = await db.rateSchedule.findFirst({
       where: { isCurrent: true },
       include: { rentalTiers: true, reviewTiers: true },
@@ -211,6 +217,7 @@ export async function saveRates(_prev: ActionState, formData: FormData): Promise
           label: `Updated ${new Date().toISOString().slice(0, 10)}`,
           effectiveFrom: new Date(),
           isCurrent: true,
+          rescueDefaultCents,
           rentalTiers: { create: rentalTiers },
           reviewTiers: { create: reviewTiers },
         },
@@ -222,9 +229,13 @@ export async function saveRates(_prev: ActionState, formData: FormData): Promise
       action: "RATES_UPDATE",
       entity: "RateSchedule",
       before: previous
-        ? { rentalTiers: previous.rentalTiers, reviewTiers: previous.reviewTiers }
+        ? {
+            rentalTiers: previous.rentalTiers,
+            reviewTiers: previous.reviewTiers,
+            rescueDefaultCents: previous.rescueDefaultCents,
+          }
         : undefined,
-      after: { rentalTiers, reviewTiers },
+      after: { rentalTiers, reviewTiers, rescueDefaultCents },
     });
 
     revalidatePath("/admin/settings");

@@ -83,6 +83,7 @@ async function main() {
         label: "2026 bonus structure",
         effectiveFrom: new Date(Date.UTC(2026, 0, 1)),
         isCurrent: true,
+        rescueDefaultCents: 2_500,
         rentalTiers: {
           create: RENTAL_TIERS.map(([minRentals, bonusCents]) => ({ minRentals, bonusCents })),
         },

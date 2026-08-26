@@ -47,6 +47,12 @@ export default async function AdminDayPage({
     }),
   ]);
 
+  const rescueDefaultCents =
+    (await db.rateSchedule.findFirst({
+      where: { isCurrent: true },
+      select: { rescueDefaultCents: true },
+    }))?.rescueDefaultCents ?? 2_500;
+
   const locked = day?.payPeriod.status === "LOCKED";
   const bounds = periodForDate(date);
   const minutesByUser = new Map(day?.entries.map((entry) => [entry.userId, entry.minutes]) ?? []);
@@ -127,6 +133,7 @@ export default async function AdminDayPage({
             userId={roster[0].id}
             employees={roster}
             allowChoosingEmployee
+            rescueDefaultCents={rescueDefaultCents}
           />
         )}
       </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { addTip, deleteTip, saveDayNumbers, saveShift } from "@/app/actions/entry";
@@ -183,19 +183,56 @@ export function TipForm({
   userId,
   employees,
   allowChoosingEmployee,
+  rescueDefaultCents,
 }: {
   date: string;
   userId: string;
   employees: Array<{ id: string; name: string }>;
   allowChoosingEmployee?: boolean;
+  rescueDefaultCents: number;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(addTip, {});
+  const [amount, setAmount] = useState("");
+  const [kind, setKind] = useState<"RESCUE" | "WATER" | "OTHER">("RESCUE");
+  const amountRef = useRef<HTMLInputElement>(null);
+
+  const rescueAmount = (rescueDefaultCents / 100).toFixed(2).replace(/\.00$/, "");
+
+  // A rescue is always the same amount, so it should not need typing.
+  // Water varies, so that button only sets the type and puts the cursor
+  // in the amount box.
+  const quickRescue = () => {
+    setKind("RESCUE");
+    setAmount(rescueAmount);
+  };
+  const quickWater = () => {
+    setKind("WATER");
+    setAmount("");
+    amountRef.current?.focus();
+  };
 
   return (
     <form action={formAction} className="space-y-3">
       <Feedback state={state} />
       <input type="hidden" name="date" value={date} />
       {allowChoosingEmployee ? null : <input type="hidden" name="userId" value={userId} />}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={quickRescue}
+          className="rounded-lg border border-clay/40 bg-clay/5 px-4 py-2 text-sm font-medium text-clay transition hover:bg-clay/10"
+        >
+          + Rescue ${rescueAmount}
+        </button>
+        <button
+          type="button"
+          onClick={quickWater}
+          className="rounded-lg border border-ink/20 bg-white px-4 py-2 text-sm font-medium transition hover:bg-sand"
+        >
+          + Water sale
+        </button>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
         {allowChoosingEmployee ? (
@@ -210,10 +247,23 @@ export function TipForm({
           </Field>
         ) : null}
         <Field label="Amount">
-          <input name="amount" inputMode="decimal" placeholder="25.00" className={inputClass} />
+          <input
+            ref={amountRef}
+            name="amount"
+            inputMode="decimal"
+            placeholder={rescueAmount}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            className={inputClass}
+          />
         </Field>
         <Field label="Type">
-          <select name="kind" defaultValue="RESCUE" className={inputClass}>
+          <select
+            name="kind"
+            value={kind}
+            onChange={(event) => setKind(event.target.value as typeof kind)}
+            className={inputClass}
+          >
             <option value="RESCUE">Rescue</option>
             <option value="WATER">Water sale</option>
             <option value="OTHER">Other</option>

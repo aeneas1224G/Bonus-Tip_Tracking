@@ -23,7 +23,10 @@ These came out of an interview with the owner. Do not re-litigate them without a
 
 | Question | Decision |
 | --- | --- |
-| How is the pool split? | **Period pool ÷ period hours × employee hours.** Not day by day. |
+| How is the pool split? | **Day by day.** Each day's pool goes to that day's crew by hours; shares sum across the period. Changed from period-wide on 2026-08-25 after the sheet was re-read as CSV — see below. |
+| How is the review bonus split? | **Period-wide** by total period hours, since reviews are a period figure. |
+| Rescue payout | **Flat $25**, one-tap button, editable in settings. |
+| Review count | **Total** Google reviews, not 5-star only. |
 | Who enters rentals and the review count? | **Any employee, first one wins.** Owner can correct. |
 | Cash tips (water sales, rescues) | **Credited to that person alone.** Never pooled. |
 | Gusto handoff | **CSV export now, API push later.** Data model carries `gustoEmployeeId`. |
@@ -87,6 +90,8 @@ one or two at a time rather than as a block.
    an 8/17 rescue note with no column of his own.
 3. **Day boundary** — employees can edit until local midnight, timezone defaulted to
    `America/Denver`. Neither the boundary nor the timezone is confirmed.
+5. **The sheet's 577-hour figure** was declared stale by the owner and is ignored.
+   All logged hours count toward bonus; there is no separate non-bonus hours bucket.
 4. **What to build next** — historical import, Gusto API, alerts, or dashboard.
 
 The recommendation given, and still the right one: **load the 8/10–8/23 period from the
@@ -101,9 +106,13 @@ against their own data.
 The sheet had four defects. The app fixes rather than reproduces them, and the owner
 agreed to each fix.
 
-1. **Two payout calculations that disagreed by $212.** The right-hand summary table
-   prorated by hours; the `Totals` row summed hand-typed daily cells and came to $3,159
-   against a $2,947 pool. The app uses the proration.
+1. **A second calculation that was never used.** The right-hand summary block
+   ($2,947 across 577 hours, $5.11/hr) produced Pete $924 / Taylor $690 / Evie $598.
+   The amounts actually paid came from the daily grid: Pete $957 / Taylor $880 /
+   Evie $770. Reading the sheet as formatted text made the summary block look
+   authoritative; exporting it as CSV showed it was not. **If you are re-deriving
+   any rule from this sheet, export it as CSV — the formatted read misaligns
+   columns.**
 2. **Cash tips inflated the shared pool.** $147 of water and rescue money sat inside the
    $2,947, so one person's water sale moved everyone else's share.
 3. **A negative review bonus.** The current period showed `-$1,944` because the formula

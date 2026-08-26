@@ -36,12 +36,25 @@ export default async function EntryPage() {
     }),
   ]);
 
+  const rescueDefaultCents =
+    (await db.rateSchedule.findFirst({
+      where: { isCurrent: true },
+      select: { rescueDefaultCents: true },
+    }))?.rescueDefaultCents ?? 2_500;
+
   const bounds = periodForDate(today);
   const { result } = await loadPeriod(bounds);
 
   const myEntry = day?.entries.find((entry) => entry.userId === session.id);
   const myTips = day?.tips.filter((tip) => tip.userId === session.id) ?? [];
   const myPayout = result.employees.find((employee) => employee.userId === session.id);
+
+  // Today specifically, because under day-by-day splitting the rate an employee
+  // is earning right now is what they actually want to see.
+  const todayBreakdown = result.days.find((day) => day.date === today);
+  const myTodayShare = todayBreakdown?.shares.find(
+    (share) => share.userId === session.id,
+  )?.shareCents;
   const locked = day?.payPeriod.status === "LOCKED";
 
   return (
@@ -112,7 +125,14 @@ export default async function EntryPage() {
         ) : (
           <p className="mb-4 text-sm text-ink/60">No cash tips logged today.</p>
         )}
-        {locked ? null : <TipForm date={today} userId={session.id} employees={employees} />}
+        {locked ? null : (
+          <TipForm
+            date={today}
+            userId={session.id}
+            employees={employees}
+            rescueDefaultCents={rescueDefaultCents}
+          />
+        )}
       </Card>
 
       <Card
@@ -137,9 +157,27 @@ export default async function EntryPage() {
           />
         </dl>
         <p className="mt-4 text-sm text-ink/60">
-          Pool so far <Money cents={result.tipPoolCents} /> across{" "}
-          {minutesToHours(result.totalMinutes).toFixed(2)} hours ={" "}
-          <Money cents={result.tipRatePerHourCents} />/hr.{" "}
+          {todayBreakdown && todayBreakdown.poolCents > 0 ? (
+            <>
+              Today: {todayBreakdown.rentalCount} rentals earned a{" "}
+              <Money cents={todayBreakdown.poolCents} /> pool, split{" "}
+              {todayBreakdown.staffCount === 1
+                ? "just to you"
+                : `across ${todayBreakdown.staffCount} of you`}{" "}
+              by hours — <Money cents={todayBreakdown.ratePerHourCents} />
+              /hr.{" "}
+              {myTodayShare !== undefined ? (
+                <>
+                  Your share so far: <Money cents={myTodayShare} bold />.{" "}
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              Today has not earned a pool yet — the rentals count has to go in before
+              anyone earns for today.{" "}
+            </>
+          )}
           <Link href="/period" className="underline">
             See the full sheet
           </Link>

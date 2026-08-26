@@ -46,6 +46,7 @@ export default async function SettingsPage() {
 
       <Card>
         <RatesForm
+          rescueDefaultCents={schedule.rescueDefaultCents}
           rentalTiers={schedule.rentalTiers.map((tier) => ({
             minRentals: tier.minRentals,
             bonusCents: tier.bonusCents,

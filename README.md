@@ -28,31 +28,46 @@ Below 10 rentals a day earns nothing, and a day marked closed earns nothing.
 that depends on how many the period earned: under 75 → $3 each, 75–99 → $4,
 100–149 → $5, 150+ → $7.
 
-**3. Both pools are split by hours, period-wide.** Sum the pools for the whole two
-weeks, divide by total hours worked in those two weeks, multiply by each person's
-hours. Not day by day.
+**3. The daily pool is split day by day.** Each day's pool goes to only the people
+who worked *that day*, in proportion to their hours, and those daily shares are
+summed across the period. A busy Saturday pays far more per hour than a slow Monday
+— 8/22/26 paid $25.00/hr while 8/10/26 paid $4.76/hr — so you are paid for the days
+you were actually there. Hours on a closed day earn nothing and dilute nobody.
+
+**3b. The review bonus is split period-wide**, because reviews are counted across the
+whole period and there is no single day to attribute them to. That one pool is
+divided by total period hours.
 
 **4. Cash tips are not pooled.** Water sales and rescue tips are paid entirely to
-the person who earned them and never dilute anyone else's share.
+the person who earned them and never dilute anyone else's share. Rescues are a flat
+$25 and get a one-tap button; water amounts are typed in.
 
 Both ladders are editable at **Admin → Bonus rates**. Saving creates a new version
 rather than overwriting the old one, so a pay period you have already locked keeps
 the rates it was actually paid at.
 
-### Differences from the spreadsheet
+### Parity with the spreadsheet
 
-The sheet calculated payouts two ways that disagreed by $212 for the 8/10–8/23
-period. The app uses the period-wide hourly proration (the sheet's own right-hand
-summary table), which always reconciles to the penny. Fed the sheet's own $2,947
-pool and 577 hours, it reproduces the sheet's published dollars exactly — Pete $924,
-Taylor $690, Evie $598, Kyle $659, Jonah $77. That parity is asserted in
-`tests/calc.test.ts`.
+The sheet's daily money column decodes exactly as *that day's pool split by that
+day's hours, plus that person's own cash tips*. The engine reconstructs it cell by
+cell, and `tests/calc.test.ts` asserts every one of those cells rather than a
+summary total. Across the 8/10–8/23 period the engine produces $3,319 against the
+$3,316 the sheet paid — a $3 gap that comes entirely from the sheet rounding its own
+cells by hand, inconsistently (on 8/11 Pete's $65.22 was written down to $65 while
+Kyle's $39.13 was written up to $40).
 
-Three other fixes:
+Per person, the daily column agrees within about a dollar. What is left over is the
+review bonus, where the sheet's hours column was demonstrably wrong: it credited
+Taylor 135 hours and Kyle 129 against the 69 and 46 they actually logged, and its
+own column summed to 482 while the cell above it said 497.
 
-- **Cash tips no longer inflate the shared pool.** The sheet folded $147 of water
-  and rescue money into the $2,947 pot, so everyone's share moved when one person
-  sold a bottle of water.
+### Other fixes
+
+- **A second, unused calculation is gone.** The sheet carried a right-hand summary
+  block ($2,947 across 577 hours at $5.11/hr) that produced different numbers from
+  the ones actually paid and was never used. There is now one calculation.
+- **Cash tips no longer inflate the shared pool.** The sheet folded cash tips into
+  the pot, so everyone's share moved when one person sold a bottle of water.
 - **The review bonus can no longer go negative.** The sheet's current period showed
   `-$1,944` because it subtracted the period's own first review reading and the last
   one was blank. The app measures from the *previous* period's closing count, clamps

@@ -9,17 +9,27 @@
  *
  *   1. Each open day earns a POOL from a tier ladder keyed on rentals that day
  *      (40+ rentals = $100, 50+ = $150, ...). Closed days earn nothing.
- *   2. Those daily pools are summed across the whole two-week period, then
- *      divided by TOTAL HOURS worked in the period, then multiplied by each
- *      employee's hours. Not day by day — period-wide.
- *   3. The review bonus works the same way. New Google reviews earned during
- *      the period are multiplied by a per-review rate that is itself tiered on
- *      the period's review count, giving a second pool split by the same hours.
+ *   2. Each day's pool is split among ONLY THE PEOPLE WHO WORKED THAT DAY, in
+ *      proportion to their hours, and those daily shares are summed across the
+ *      period. Day by day, not period-wide — you are paid for the days you were
+ *      actually there, so a busy Saturday pays more per hour than a slow Monday.
+ *   3. The review bonus is different, because reviews are counted per period
+ *      rather than per day. New Google reviews earned during the period are
+ *      multiplied by a per-review rate that is itself tiered on the period's
+ *      review count, and that single pool is split across the period's total
+ *      hours.
  *   4. Individual cash tips (water sales, rescues) are paid 100% to the person
  *      who earned them and never enter either pool.
+ *
+ * Rule 2 is verified cell by cell against the owner's spreadsheet in
+ * tests/calc.test.ts — the daily shares reconstruct its daily grid exactly.
  */
 
 import { allocateByWeight, MINUTES_PER_HOUR } from "./money";
+
+function formatDollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 export type RentalTier = { minRentals: number; bonusCents: number };
 export type ReviewTier = { minReviews: number; perReviewCents: number };
@@ -54,6 +64,12 @@ export type EmployeePayout = {
   totalCents: number;
 };
 
+export type DayShare = {
+  userId: string;
+  minutes: number;
+  shareCents: number;
+};
+
 export type DayBreakdown = {
   date: string;
   rentalCount: number | null;
@@ -61,6 +77,9 @@ export type DayBreakdown = {
   poolCents: number;
   minutes: number;
   staffCount: number;
+  /** What this day paid per hour. Varies day to day — that is the point. */
+  ratePerHourCents: number;
+  shares: DayShare[];
 };
 
 export type CalcWarning = {
@@ -81,8 +100,11 @@ export type CalcResult = {
   reviewPoolCents: number;
   totalPoolCents: number;
   totalMinutes: number;
-  /** Display-only derived rates, rounded to the cent. */
-  tipRatePerHourCents: number;
+  /**
+   * Display-only. The tip figure is the period AVERAGE across every day —
+   * useful as a headline, but no individual day paid exactly this rate.
+   */
+  averageTipRatePerHourCents: number;
   reviewRatePerHourCents: number;
   employees: EmployeePayout[];
   days: DayBreakdown[];
@@ -165,9 +187,15 @@ export function calculatePeriod(input: CalcInput): CalcResult {
   const { days, rentalTiers, reviewTiers, reviewBaseline } = input;
   const warnings: CalcWarning[] = [];
 
-  // --- Pool 1: daily rental bonuses, summed across the period ------------
+  // --- Pool 1: each day's bonus, split among that day's crew ---------------
+  //
+  // The split happens per day, so someone who worked only the slow days does
+  // not ride on a Saturday they were not there for. Each day is allocated by
+  // largest remainder, so every day's shares sum to exactly that day's pool,
+  // and therefore the period total is exact too.
   let tipPoolCents = 0;
   const dayBreakdowns: DayBreakdown[] = [];
+  const tipShareByUser = new Map<string, number>();
 
   for (const day of days) {
     const minutes = day.entries.reduce((sum, entry) => sum + entry.minutes, 0);
@@ -178,18 +206,30 @@ export function calculatePeriod(input: CalcInput): CalcResult {
 
     tipPoolCents += poolCents;
 
+    const working = day.entries.filter((entry) => entry.minutes > 0);
+    const allocation = allocateByWeight(
+      poolCents,
+      working.map((entry) => ({ key: entry.userId, weight: entry.minutes })),
+    );
+
+    const shares: DayShare[] = working.map((entry) => {
+      const shareCents = allocation.get(entry.userId) ?? 0;
+      tipShareByUser.set(entry.userId, (tipShareByUser.get(entry.userId) ?? 0) + shareCents);
+      return { userId: entry.userId, minutes: entry.minutes, shareCents };
+    });
+
     if (!day.closed && day.rentalCount === null && minutes > 0) {
       warnings.push({
         code: "HOURS_WITHOUT_RENTALS",
         date: day.date,
-        message: `${day.date}: hours were logged but no rental count was entered, so this day contributes $0 to the pool.`,
+        message: `${day.date}: hours were logged but no rental count was entered, so everyone who worked that day earns $0 for it.`,
       });
     }
     if (!day.closed && day.rentalCount !== null && day.rentalCount > 0 && minutes === 0) {
       warnings.push({
         code: "RENTALS_WITHOUT_HOURS",
         date: day.date,
-        message: `${day.date}: ${day.rentalCount} rentals were recorded but nobody logged hours.`,
+        message: `${day.date}: ${day.rentalCount} rentals were recorded but nobody logged hours, so this day's ${formatDollars(poolCents)} pool goes unpaid.`,
       });
     }
 
@@ -199,17 +239,23 @@ export function calculatePeriod(input: CalcInput): CalcResult {
       closed: day.closed,
       poolCents,
       minutes,
-      staffCount: day.entries.filter((entry) => entry.minutes > 0).length,
+      staffCount: working.length,
+      ratePerHourCents:
+        minutes === 0 ? 0 : Math.round((poolCents * MINUTES_PER_HOUR) / minutes),
+      shares,
     });
   }
 
-  // --- Pool 2: review bonus ----------------------------------------------
+  // --- Pool 2: review bonus, which is a period figure ---------------------
+  //
+  // Reviews are counted across the whole period rather than per day, so there
+  // is no day to attribute them to. This one pool is split by period hours.
   const reviews = reviewsEarned(days, reviewBaseline);
   warnings.push(...reviews.warnings);
   const perReviewCents = reviewRateCents(reviews.count, reviewTiers);
   const reviewPoolCents = reviews.count * perReviewCents;
 
-  // --- Hours, which are the divisor for both pools ------------------------
+  // --- Hours, and anyone who earned a tip without logging a shift ---------
   const minutesByUser = new Map<string, number>();
   for (const day of days) {
     for (const entry of day.entries) {
@@ -241,12 +287,11 @@ export function calculatePeriod(input: CalcInput): CalcResult {
     weight: minutes,
   }));
 
-  const tipShares = allocateByWeight(tipPoolCents, weights);
   const reviewShares = allocateByWeight(reviewPoolCents, weights);
 
   const employees: EmployeePayout[] = weights
     .map(({ key: userId, weight: minutes }) => {
-      const tipShareCents = tipShares.get(userId) ?? 0;
+      const tipShareCents = tipShareByUser.get(userId) ?? 0;
       const reviewShareCents = reviewShares.get(userId) ?? 0;
       const individualTipCents = tipsByUser.get(userId) ?? 0;
       return {
@@ -270,7 +315,7 @@ export function calculatePeriod(input: CalcInput): CalcResult {
     reviewPoolCents,
     totalPoolCents: tipPoolCents + reviewPoolCents,
     totalMinutes,
-    tipRatePerHourCents: perHour(tipPoolCents),
+    averageTipRatePerHourCents: perHour(tipPoolCents),
     reviewRatePerHourCents: perHour(reviewPoolCents),
     employees,
     days: dayBreakdowns,
