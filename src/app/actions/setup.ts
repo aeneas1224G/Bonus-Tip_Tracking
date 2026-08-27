@@ -15,16 +15,13 @@ import {
   setupTokenMatches,
 } from "@/lib/setup";
 import { pruneRateLimits, rateLimit } from "@/lib/rateLimit";
+import { validateUsername } from "@/lib/username";
 import type { ActionState } from "./auth";
 
 const schema = z
   .object({
     token: z.string().min(1, "Enter the setup token."),
-    username: z
-      .string()
-      .min(3, "Username needs at least 3 characters.")
-      .max(40)
-      .regex(/^[a-zA-Z0-9._-]+$/, "Username can use letters, numbers, dot, dash and underscore."),
+    username: z.string(),
     password: z.string().min(12, "Use at least 12 characters — this account controls payroll."),
     confirm: z.string(),
   })
@@ -71,6 +68,9 @@ export async function completeSetup(
       return { error: "That setup token is not right." };
     }
 
+    const username = validateUsername(parsed.data.username);
+    if (!username.ok) return { error: username.message };
+
     const passwordHash = await hashSecret(parsed.data.password);
 
     const admin = await db.$transaction(async (tx) => {
@@ -83,7 +83,7 @@ export async function completeSetup(
       const created = await tx.user.create({
         data: {
           name: "Owner",
-          username: parsed.data.username,
+          username: username.value,
           passwordHash,
           role: "ADMIN",
         },

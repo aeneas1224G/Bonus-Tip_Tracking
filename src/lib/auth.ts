@@ -153,7 +153,11 @@ export async function verifyAdminPassword(
   username: string,
   password: string,
 ): Promise<SessionUser | null> {
-  const user = await db.user.findUnique({ where: { username } });
+  // Case-insensitive, because an email address typed with a capital is the
+  // same account and this app has no password reset to fall back on.
+  const user = await db.user.findFirst({
+    where: { username: { equals: username.trim(), mode: "insensitive" } },
+  });
   if (!user || !user.active || !user.passwordHash || user.role !== "ADMIN") {
     // Burn roughly the same time as a real compare so a missing username and a
     // wrong password are not distinguishable by response timing.

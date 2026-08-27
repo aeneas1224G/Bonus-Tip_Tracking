@@ -38,6 +38,7 @@ export default async function AdminPage({
         <div className="flex flex-wrap gap-2">
           <LinkButton href="/admin/employees">Employees</LinkButton>
           <LinkButton href="/admin/settings">Bonus rates</LinkButton>
+          <LinkButton href="/admin/account">Account</LinkButton>
           <form action={logout}>
             <Button variant="ghost" type="submit">
               Sign out
