@@ -14,7 +14,9 @@ import {
   setupTokenConfigured,
   setupTokenMatches,
 } from "@/lib/setup";
+import { humanizeWait } from "@/lib/password";
 import { pruneRateLimits, rateLimit } from "@/lib/rateLimit";
+import { validatePassword } from "@/lib/password";
 import { validateUsername } from "@/lib/username";
 import type { ActionState } from "./auth";
 
@@ -22,12 +24,8 @@ const schema = z
   .object({
     token: z.string().min(1, "Enter the setup token."),
     username: z.string(),
-    password: z.string().min(12, "Use at least 12 characters — this account controls payroll."),
+    password: z.string(),
     confirm: z.string(),
-  })
-  .refine((data) => data.password === data.confirm, {
-    message: "The two passwords do not match.",
-    path: ["confirm"],
   });
 
 export async function completeSetup(
@@ -38,7 +36,7 @@ export async function completeSetup(
     pruneRateLimits();
     const limit = rateLimit("setup", { limit: 5, windowSeconds: 300 });
     if (!limit.allowed) {
-      return { error: `Too many attempts. Try again in ${limit.retryAfterSeconds} seconds.` };
+      return { error: `Too many attempts. Try again in ${humanizeWait(limit.retryAfterSeconds)}.` };
     }
 
     if (!setupTokenConfigured()) {
@@ -70,6 +68,9 @@ export async function completeSetup(
 
     const username = validateUsername(parsed.data.username);
     if (!username.ok) return { error: username.message };
+
+    const password = validatePassword(parsed.data.password, parsed.data.confirm);
+    if (!password.ok) return { error: password.message };
 
     const passwordHash = await hashSecret(parsed.data.password);
 

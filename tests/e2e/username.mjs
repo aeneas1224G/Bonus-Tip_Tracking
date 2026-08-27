@@ -3,6 +3,10 @@
  *
  * Setup: seeded database, server on :3100 (see smoke.mjs header).
  *   node tests/e2e/username.mjs
+ *
+ * Run it against a freshly seeded database — it changes the owner's
+ * username and password, so running two suites back to back without
+ * reseeding will fail on sign-in, not on anything real.
  */
 import { chromium } from "playwright";
 
@@ -44,9 +48,12 @@ check("account page shows the current name", ((await page.textContent("body")) ?
 
 const change = async (username, password) => {
   await page.goto(BASE + "/admin/account", { waitUntil: "networkidle" });
-  await page.fill('input[name="username"]', username);
-  await page.fill('input[name="currentPassword"]', password);
-  await page.getByRole("button", { name: /Change sign-in name/i }).click();
+  // Scope to the sign-in-name form: the password form on the same page also
+  // has a "current password" field, so a bare selector matches both.
+  const form = page.locator("form").filter({ hasText: "Change sign-in name" });
+  await form.locator('input[name="username"]').fill(username);
+  await form.locator('input[name="currentPassword"]').fill(password);
+  await form.getByRole("button", { name: /Change sign-in name/i }).click();
   await page.waitForTimeout(1100);
   return (await page.textContent("body")) ?? "";
 };

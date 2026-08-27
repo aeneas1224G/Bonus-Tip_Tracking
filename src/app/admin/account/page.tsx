@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { UsernameForm } from "@/components/AccountForm";
+import { PasswordForm, UsernameForm } from "@/components/AccountForm";
 import { Banner, Card, LinkButton, Shell } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -36,11 +36,19 @@ export default async function AccountPage() {
         <UsernameForm current={admin?.username ?? ""} />
       </Card>
 
+      <Card
+        title="Password"
+        description="Changing it signs nothing out — you stay signed in here."
+      >
+        <PasswordForm />
+      </Card>
+
       <Banner tone="warn">
-        <p className="mb-1 font-medium">Changing this does not change your password</p>
+        <p className="mb-1 font-medium">There is no reset link, on purpose</p>
         <p>
-          And there is still no reset link — if you lose the password, getting back in
-          means someone editing the database directly. Keep it in a password manager.
+          A reset link on a payroll app is a way in for anyone who reaches your email.
+          The cost is that a lost password means editing the database by hand, so keep
+          this one in a password manager.
         </p>
       </Banner>
     </Shell>
