@@ -149,10 +149,25 @@ export async function verifyPin(userId: string, pin: string): Promise<PinResult>
   return { ok: true, user: { id: user.id, name: user.name, role: user.role } };
 }
 
+export type AdminAuthResult =
+  | { ok: true; user: SessionUser }
+  | { ok: false; reason: "INVALID" }
+  | { ok: false; reason: "LOCKED"; until: Date };
+
+/**
+ * A locked account used to be reported as simply "wrong", which meant an owner
+ * typing their correct password during a lockout had no way to tell the
+ * difference — and on an app with no password reset, that reads as being
+ * permanently locked out.
+ *
+ * So the password is now checked even while the account is locked, and the
+ * lockout is only revealed when the password was right. Someone who does not
+ * know the password learns nothing, including whether the account exists.
+ */
 export async function verifyAdminPassword(
   username: string,
   password: string,
-): Promise<SessionUser | null> {
+): Promise<AdminAuthResult> {
   // Case-insensitive, because an email address typed with a capital is the
   // same account and this app has no password reset to fall back on.
   const user = await db.user.findFirst({
@@ -162,29 +177,37 @@ export async function verifyAdminPassword(
     // Burn roughly the same time as a real compare so a missing username and a
     // wrong password are not distinguishable by response timing.
     await bcrypt.compare(password, "$2a$12$" + "x".repeat(53));
-    return null;
+    return { ok: false, reason: "INVALID" };
   }
-  if (user.lockedUntil && user.lockedUntil > new Date()) return null;
 
   const matches = await verifySecret(password, user.passwordHash);
+  const locked = user.lockedUntil !== null && user.lockedUntil > new Date();
+
   if (!matches) {
-    const failedAttempts = user.failedAttempts + 1;
-    await db.user.update({
-      where: { id: user.id },
-      data: {
-        failedAttempts: failedAttempts >= MAX_ATTEMPTS ? 0 : failedAttempts,
-        lockedUntil:
-          failedAttempts >= MAX_ATTEMPTS
-            ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
-            : null,
-      },
-    });
-    return null;
+    // No point counting further attempts against an account already frozen.
+    if (!locked) {
+      const failedAttempts = user.failedAttempts + 1;
+      await db.user.update({
+        where: { id: user.id },
+        data: {
+          failedAttempts: failedAttempts >= MAX_ATTEMPTS ? 0 : failedAttempts,
+          lockedUntil:
+            failedAttempts >= MAX_ATTEMPTS
+              ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
+              : null,
+        },
+      });
+    }
+    return { ok: false, reason: "INVALID" };
   }
+
+  // Right password, wrong moment. Say so — the wait is finite and knowing that
+  // is the difference between patience and a panicked database edit.
+  if (locked) return { ok: false, reason: "LOCKED", until: user.lockedUntil! };
 
   await db.user.update({
     where: { id: user.id },
     data: { failedAttempts: 0, lockedUntil: null },
   });
-  return { id: user.id, name: user.name, role: user.role };
+  return { ok: true, user: { id: user.id, name: user.name, role: user.role } };
 }

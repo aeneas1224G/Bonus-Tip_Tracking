@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { createSession, destroySession, getSession, verifyAdminPassword, verifyPin } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { humanizeWait } from "@/lib/password";
 import { PIN_LENGTH, PIN_PATTERN } from "@/lib/pin";
 import { pruneRateLimits, rateLimit } from "@/lib/rateLimit";
 
@@ -32,7 +33,7 @@ export async function loginWithPin(
   // grind the keyspace by rotating through employees.
   const limit = rateLimit(await clientKey("pin"), { limit: 10, windowSeconds: 60 });
   if (!limit.allowed) {
-    return { error: `Too many attempts. Try again in ${limit.retryAfterSeconds} seconds.` };
+    return { error: `Too many attempts from this device. Try again in ${humanizeWait(limit.retryAfterSeconds)}.` };
   }
 
   const parsed = pinSchema.safeParse({
@@ -87,7 +88,12 @@ export async function loginAsAdmin(
 
   const limit = rateLimit(await clientKey("admin"), { limit: 8, windowSeconds: 300 });
   if (!limit.allowed) {
-    return { error: `Too many attempts. Try again in ${limit.retryAfterSeconds} seconds.` };
+    return {
+      error:
+        `Too many sign-in attempts from this device. Try again in ` +
+        `${humanizeWait(limit.retryAfterSeconds)}. This is a limit on the device, ` +
+        `not your account — your password is fine if you know it.`,
+    };
   }
 
   const parsed = adminSchema.safeParse({
@@ -98,14 +104,30 @@ export async function loginAsAdmin(
     return { error: parsed.error.issues[0]?.message ?? "Check your details." };
   }
 
-  const user = await verifyAdminPassword(parsed.data.username, parsed.data.password);
-  if (!user) {
+  const result = await verifyAdminPassword(parsed.data.username, parsed.data.password);
+
+  if (!result.ok) {
     await recordAudit({ action: "LOGIN_FAILED", entity: "User", entityId: parsed.data.username });
+
+    if (result.reason === "LOCKED") {
+      const minutes = Math.max(1, Math.ceil((result.until.getTime() - Date.now()) / 60_000));
+      return {
+        error:
+          `That password is correct, but the account is locked for ${minutes} more ` +
+          `minute${minutes === 1 ? "" : "s"} after too many failed attempts. ` +
+          `Wait it out and sign in again — nothing else is wrong.`,
+      };
+    }
     return { error: "Username or password is not right." };
   }
 
-  await createSession(user);
-  await recordAudit({ actorId: user.id, action: "LOGIN", entity: "User", entityId: user.id });
+  await createSession(result.user);
+  await recordAudit({
+    actorId: result.user.id,
+    action: "LOGIN",
+    entity: "User",
+    entityId: result.user.id,
+  });
   redirect("/admin");
 }
 
